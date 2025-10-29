@@ -1,9 +1,14 @@
 {
-  "name": "foremindnet/dump-server",
-  "description": "Enhanced Laravel dump server with custom functionality",
+  "name": "foremind/dump-server",
+  "description": "Development tool: Enhanced Laravel dump server with custom functionality (install with --dev)",
+  "version": "1.0.0",
   "type": "library",
   "minimum-stability": "stable",
   "license": "proprietary",
+  "suggest": {
+    "Install with --dev flag": "This package is intended for development use only. Install with: composer require foremind/dump-server --dev"
+  },
+  "keywords": ["laravel", "debugging", "development", "dump", "var-dump", "dev-only"],
   "authors": [
     {
       "name": "Cam Kemshal-Bell",
