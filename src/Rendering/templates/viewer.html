@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgNjQgNjQiPjxwYXRoIGZpbGw9IiMxYjc1YmIiIGQ9Ik01Ny41NSAxNC40NDljOS42OTcgMTQuMTEgNi4xMTEgMzMuNDA2LTggNDMuMWMtMTQuMTEgOS42OTctMzMuNDA3IDYuMTEyLTQzLjEtOGMtOS42ODctMTQuMTEtNi4xMTEtMzMuNDA4IDgtNDMuMWMxNC4xMS05LjY4NyAzMy40MDYtNi4xMDkgNDMuMSA4Ii8+PC9zdmc+" />
+    <title>Laravel Dumps - Foremind</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .header {
+            background: #2d3748;
+            padding: 1rem;
+            border-bottom: 2px solid #4a5568;
+            position: sticky;
+            top: 0;
+            z-index: 99999999;
+        }
+        .header h1 {
+            color: #63b3ed;
+            font-size: 1.5rem;
+        }
+        .header .controls {
+            margin-top: 0.5rem;
+        }
+        .btn {
+            background: #3182ce;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            margin-right: 0.5rem;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.875rem;
+        }
+        .btn:hover { background: #2c5282; }
+        .status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status.connected { background: #38a169; color: white; }
+        .status.disconnected { background: #e53e3e; color: white; }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        .dump-item {
+            background: #2d3748;
+            border-left: 4px solid #63b3ed;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .dump-header {
+            background: #4a5568;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            color: #a0aec0;
+            border-bottom: 1px solid #2d3748;
+        }
+        .dump-content {
+            padding: 1rem;
+            font-family: "Monaco", "Consolas", monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            overflow-x: auto;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #718096;
+        }
+        .empty-state h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #a0aec0;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .info-text {
+            color: #a0aec0;
+            font-size: 0.875rem;
+        }
+    </style>
+    {{SYMFONY_DUMP_HEADER}}
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Laravel Dumps - Foremind</h1>
+        <div class="controls">
+            <button class="btn" onclick="clearDumps()">🗑️ Clear All</button>
+            <span id="ws-status" class="status disconnected">Disconnected</span>
+            <span id="dump-count" class="info-text">{{DUMP_COUNT}} dump(s) • Real-time</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="dumps-container">{{DUMP_ITEMS}}</div>
+    </div>
+
+    <script>
+        let ws;
+        let dumps = {{DUMPS}};
+        const wsPort = {{WS_PORT}};
+
+        function connectWebSocket() {
+            console.log("Connecting to WebSocket...");
+            console.log(`Using ws://localhost:${wsPort}`);
+            ws = new WebSocket(`ws://localhost:${wsPort}`);
+
+            ws.onopen = function() {
+                document.getElementById("ws-status").textContent = "Connected";
+                document.getElementById("ws-status").className = "status connected";
+                console.log("WebSocket connected");
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === "new_dump") {
+                    addNewDump(data.dump);
+                    updateDumpCount(data.total_dumps);
+                } else if (data.type === "dumps_cleared") {
+                    clearDumpsDisplay();
+                    updateDumpCount(0);
+                } else if (data.type === "initial_dumps") {
+                    dumps = data.dumps;
+                    renderAllDumps();
+                    updateDumpCount(data.total_dumps);
+                }
+            };
+
+            ws.onclose = function() {
+                document.getElementById("ws-status").textContent = "Disconnected";
+                document.getElementById("ws-status").className = "status disconnected";
+                console.log("WebSocket disconnected. Attempting reconnect...");
+                setTimeout(connectWebSocket, 1000);
+            };
+
+            ws.onerror = function(error) {
+                console.log("WebSocket error:", error);
+            };
+        }
+
+        function addNewDump(dump) {
+            dumps.unshift(dump);
+            if (dumps.length > 50) dumps.pop();
+
+            const container = document.getElementById("dumps-container");
+            const emptyState = container.querySelector(".empty-state");
+            if (emptyState) emptyState.remove();
+
+            const dumpElement = createDumpElement(dump, dumps.length);
+            container.insertBefore(dumpElement, container.firstChild);
+        }
+
+        function createDumpElement(dump, index) {
+            const div = document.createElement("div");
+            div.className = "dump-item";
+            div.innerHTML = '<div class="dump-header">#' + index + ' • ' + dump.time + '</div>' +
+                            '<div class="dump-content"><pre>' + dump.content + '</pre></div>';
+            return div;
+        }
+
+        function renderAllDumps() {
+            const container = document.getElementById("dumps-container");
+            container.innerHTML = "";
+
+            if (dumps.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No dumps yet</h2>
+                        <p>Use <code>dump($variable)</code> in your Laravel application to see output here.</p>
+                        <p style="margin-top: 1rem;" class="info-text">
+                            Server is listening and ready to capture dumps...
+                        </p>
+                    </div>
+                `;
+            } else {
+                dumps.forEach((dump, i) => {
+                    container.appendChild(createDumpElement(dump, dumps.length - i));
+                });
+            }
+        }
+
+        function clearDumpsDisplay() {
+            dumps = [];
+            renderAllDumps();
+        }
+
+        function updateDumpCount(count) {
+            document.getElementById("dump-count").textContent = count + " dump(s) • Real-time";
+        }
+
+        function clearDumps() {
+            fetch("/clear").then(() => {
+                // WebSocket will handle the UI update
+            });
+        }
+
+        // Connect on page load
+        connectWebSocket();
+    </script>
+</body>
+</html>
